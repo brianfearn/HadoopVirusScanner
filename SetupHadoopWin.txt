@@ -1,0 +1,138 @@
+=================================================================
+SETTING UP SSHD AS A SERVICE FOR RUNNING HADOOP DAEMONS ON WINDOWS 7
+=================================================================
+ 
+Steps:
+ 
+1. Download 'setup.exe' from Cygwin website
+2. Right-click on 'setup.exe' 
+3. Leave settings as they are, click through until you come to the plugin selection window
+	3.1 - Make sure that the installation directory is 'C:\cygwin'
+4. In the plugin selection window, under 'Net', click on 'openssh' to install it
+5. Click 'Next', then go do something productive while installation runs its course.
+6. Once installed, go to Start -> All Programs -> Cygwin, right-click on the subsequent shortcut and select the option to 'Run as Administrator'
+ 
+7. In your cygwin window, type in the following commands:
+	$ chmod +r  /etc/passwd
+	$ chmod u+w /etc/passwd
+	$ chmod +r  /etc/group
+	$ chmod u+w /etc/group
+	$ chmod 755 /var 
+	$ touch /var/log/sshd.log
+	$ chmod 664 /var/log/sshd.log
+ 
+	This is needed in order to allow the sshd account to operate without a passphrase, which is required for Hadoop to work.
+ 
+8. Once the prompt window opens up, type 'ssh-host-config' and hit Enter
+9. Should privilege separation be used? NO
+10. Name of service to install: sshd
+11. Do you want to install sshd as a service? YES
+12. Enter the value of CYGWIN for the daemon: <LEAVE BLANK, JUST HIT ENTER>
+13. Do you want to use a different name? (default is 'cyg_server'): NO
+14. Please enter the password for user 'cyg_server': <LEAVE BLANK, JUST HIT ENTER>
+15. Reenter: <LEAVE BLANK, JUST HIT ENTER>
+ 
+At this point the ssh service should be installed, to run under the 'cyg_server' account. Don't worry, this will all be handled under the hood.
+ 
+To start the ssh service, type in 'net start sshd' in your cygwin window. When you log in next time, this will automatically run.
+ 
+To test, type in 'ssh localhost' in your cygwin window. You should not be prompted for anything.
+ 
+=================================================================
+INSTALLING AND CONFIGURING HADOOP
+=================================================================
+ 
+This is assuming the installation of version 0.20.2 of Hadoop. Newer versions do not get along with Windows 7 (mainly, the tasktracker daemon which requires permissions to be set that are inherently not allowed by Windows 7, but are required by more recent versions of Hadoop e.g. 0.20.20x.x)
+ 
+1. Download the stable version 0.20.2 of Hadoop
+2. Using 7-Zip (you should download this if you have not already, and it should be your default archive browser), open up the archive file. Copy the top level directory from the archive file and paste it into your home directory in C:/cygwin. This is usually something like C:/cygwin/home/{username}
+3. Once copied into your cygwin home directory, navigate to {hadoop-home}/conf. Open the following files for editing in your favorite editor (I strongly suggest Notepad++ ... why would you use anything else):
+	* core-site.xml
+	* hdfs-site.xml
+	* mapred-site.xml
+	* hadoop-env.sh
+	
+4. Make the following additions to the corresponding files:
+	* core-site.xml (inside the configuration tags)
+		<property>
+			<name>fs.default.name</name>
+			<value>localhost:9100</value>
+		</property>
+	* mapred-site.xml (inside the configuration tags)
+		<property>
+			<name>mapred.job.tracker</name>
+			<value>localhost:9101</value>
+		</property>
+	* hdfs-site.xml (inside the configuration tags)
+		<property>
+			<name>dfs.replication</name>
+			<value>1</value>
+		</property>
+	* hadoop-env.sh
+		* uncomment the JAVA_HOME export command, and set the path to your Java home (typically C:/Program Files/Java/{java-home}
+ 
+5. In a cygwin window, inside your top-level hadoop directory, it's time to format your Hadoop file system. Type in 'bin/hadoop namenode -format' and hit enter. This will create and format the HDFS.
+ 
+6. Now it is time to start all of the hadoop daemons that will simulate a distributed system, type in: 'bin/start-all.sh' and hit enter.
+ 
+You should not receive any errors (there may be some messages about not being able to change to the home directory, but this is ok).
+ 
+Double check that your HDFS and JobTracker is up and running properly by visiting http://localhost:50070 and http://localhost:50030, respectively.
+ 
+To make sure everything is up and running properly, let's try a regex example.
+ 
+7. From the top level hadoop directory, type in the following set of commands:
+ 
+	$ bin/hadoop dfs -mkdir input
+	$ bin/hadoop dfs -put conf input
+	$ bin/hadoop jar hadoop-*-examples.jar grep input output 'dfs[a-z.]+'
+	$ bin/hadoop dfs -cat output/*
+	
+	This should display the output of the job (finding any word that matched the regex pattern above).
+	
+8. Assuming no errors, you are all set to set up your Eclipse environment.
+ 
+FYI, you can stop all your daemons by typing in 'bin/stop-all.sh', but keep it running for now as we move on to the next step.
+ 
+=================================================================
+CONFIGURING AND USING THE HADOOP PLUGIN FOR ECLIPSE
+=================================================================
+ 
+1. Download Eclipse Indigo
+2. Download the hadoop plugin jar located at: https://issues.apache.org/jira/browse/MAPREDUCE-1280
+	The file name is 'hadoop-eclipse-plugin-0.20.3-SNAPSHOT.jar'
+	Normally you could use the plugin provided in the 0.20.2 contrib folder that comes with Hadoop, however that plugin is out of date.
+3. Copy the downloaded jar and paste it into your Eclipse plugins directory (e.g. C:/eclipse/plugins)
+4. In a regular command prompt, navigate to your eclipse folder (e.g. 'cd C:/eclipse')
+5. Type in 'eclipse -clean' and hit enter
+6. Once Eclipse is open, open a new perspective (top right corner) and select 'Other'. From the list, select 'MapReduce'.
+7. Go to Window -> Show View, and select Map/Reduce. This will open a view window for Map/Reduce Locations
+8. Now you are ready to tie in Eclipse with your existing HDFS that you formatted and configured earlier. Right click in the Map/Reduce Locations view and select 'New Hadoop Location'
+9. In the window that appears, type in 'localhost' for the Location name. Under Map/Reduce Master, type in localhost for the Host, and 9101 for the Port. For DFS Master, make sure the 'Use M/R Master host' checkbox is selected, and type in 9100 for the Port. For the User name, type in 'User'. Click 'Finish'
+10. In the Project Explorer window on the left, you should now be able to expand the DFS Locations tree and see your new location. Continue to expand it and you should see something like the following file structure:
+	DFS Locations
+		-> (1)
+			-> tmp (1)
+				-> hadoop-{username} (1)
+					-> mapred (1)
+						-> system(1)
+							-> jobtracker.info
+ 
+ 
+At this point you can create directories and files and upload them to the HDFS from Eclipse, or you can create them through the cygwin window as you did in step 7 in the previous section.
+ 
+=================================================================
+CREATING YOUR FIRST HADOOP PROJECT IN ECLIPSE
+=================================================================
+1. Open up the Java perspective
+2. In the Project Explorer window, select New -> Project...
+3. From the list that appears, select Map/Reduce Project
+4. Provide a project name, and then click on the link that says 'Configure Hadoop install directory'
+	4.1 Browse to the top-level hadoop directory that is located in cygwin (e.g. C:\cygwin\home\{username}\{hadoop directory})
+	4.2 Click 'OK'
+5. Click 'Finish'
+6. You will notice that Hadoop projects in Eclipse are simple Java projects in terms of file structure. Now let's add a class.
+7. Right click on the project, and selet New -> Other
+8. From the Map/Reduce folder in the list, select 'MapReduce Driver'. This will generate a class for you.
+ 
+At this point, you are all set to go, now it's time to learn all about MapReduce, which is outside the context of this documentation. Enjoy and have fun.
