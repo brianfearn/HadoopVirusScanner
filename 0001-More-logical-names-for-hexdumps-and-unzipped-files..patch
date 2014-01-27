@@ -1,0 +1,26 @@
+From 8c9ceb0f1fadcd9a7e848353a19a57ef8034c092 Mon Sep 17 00:00:00 2001
+From: Brian <brian@Brian.(none)>
+Date: Mon, 27 Jan 2014 14:41:06 -0500
+Subject: [PATCH] More logical names for hexdumps and unzipped files.
+
+---
+ fireUnzipVirus.sh |    7 +++++++
+ 1 file changed, 7 insertions(+)
+ create mode 100644 fireUnzipVirus.sh
+
+diff --git a/fireUnzipVirus.sh b/fireUnzipVirus.sh
+new file mode 100644
+index 0000000..9d79529
+--- /dev/null
++++ b/fireUnzipVirus.sh
+@@ -0,0 +1,7 @@
++for name in *.zip; do
++    unzip -P infected $name;
++    name="${name%.*}"
++    mv malware.exe $name.exe;
++    xxd $name.exe $name.exe.hexdump;
++    echo "Created $name.exe and $name.hexdump"
++done;
+-- 
+1.7.9.5
+
