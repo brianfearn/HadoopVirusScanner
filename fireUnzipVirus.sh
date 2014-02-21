@@ -1,11 +1,7 @@
-set x = 0;
-for Z_FILE in *.zip; do
-    let x++;
-    echo $x;
-    echo $Z_FILE;
-    unzip -P infected $Z_FILE;
-    mv malware.exe $x.exe;
-    echo $x.exe;
-    xxd $x.exe $x.hexdump;
+for name in *.zip; do
+    unzip -P infected $name;
+    name="${name%.*}"
+    mv malware.exe $name.exe;
+    xxd $name.exe $name.exe.hexdump;
+    echo "Created $name.exe and $name.hexdump"
 done;
-
